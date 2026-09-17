@@ -1,0 +1,1164 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Super Célula: A Trilha da Evolução!</title>
+
+    <!-- BIBLIOTECA DE CONFETES -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background: #0f172a;
+            color: #f8fafc;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .main-wrapper {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            max-width: 1100px;
+            flex-wrap: wrap;
+        }
+
+        .left-col {
+            flex: 1.2;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .right-col {
+            flex: 1;
+            min-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .card-box {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #334155;
+        }
+
+        .board-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .square {
+            background: #334155;
+            border-radius: 8px;
+            min-height: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            position: relative;
+            padding: 4px;
+        }
+
+        .square.active {
+            border: 3px solid #f59e0b;
+            background: #0f172a;
+        }
+
+        .square.start {
+            background: #1e3a8a;
+        }
+
+        .square.evolve {
+            background: #581c87;
+        }
+
+        .player-token {
+            position: absolute;
+            font-size: 20px;
+            top: -8px;
+            right: -4px;
+            filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+        }
+
+        /* VISUALIZADOR REALISTA EM CAMADAS */
+
+        .cell-viewer {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 12px;
+            border: 2px solid #334155;
+            transition: border-color 0.5s;
+        }
+
+        .realistic-cell-viewer {
+            position: relative;
+            width: 100%;
+            max-width: 700px;
+            margin: 0 auto;
+            aspect-ratio: 1000 / 700;
+            overflow: hidden;
+            border-radius: 12px;
+            background: #07111c;
+        }
+
+        .cell-layer {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            pointer-events: none;
+            user-select: none;
+            z-index: 1;
+        }
+
+        .organelle-layer {
+            opacity: 0;
+            transition:
+                opacity 0.8s ease-in-out,
+                transform 0.8s ease-in-out;
+        }
+
+        .organelle-layer.visible {
+            opacity: 1;
+            animation: organelleAppear 0.8s ease-out;
+        }
+
+        @keyframes organelleAppear {
+            0% {
+                opacity: 0;
+                transform: scale(0.94);
+                filter: brightness(2);
+            }
+
+            60% {
+                opacity: 1;
+                transform: scale(1.02);
+                filter: brightness(1.3);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+                filter: brightness(1);
+            }
+        }
+
+        /* LOJA */
+
+        .shop-card {
+            max-height: 350px;
+            overflow-y: auto;
+            border-color: #10b981;
+        }
+
+        .shop-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: #0f172a;
+            margin: 6px 0;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+
+        .shop-item.owned {
+            border-left: 4px solid #10b981;
+            opacity: 0.7;
+        }
+
+        /* BOTÕES */
+
+        .btn-action {
+            background: #f59e0b;
+            color: black;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .btn-action:hover {
+            background: #fbbf24;
+        }
+
+        .btn-action:disabled {
+            background: #64748b;
+            cursor: not-allowed;
+        }
+
+        /* BOTÃO DE REINICIAR */
+        .btn-reset {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .btn-reset:hover {
+            background: #dc2626;
+        }
+
+        .atp-badge {
+            background: #f59e0b;
+            color: #000;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+
+        /* MODAIS */
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-content {
+            background: #1e293b;
+            padding: 25px;
+            border-radius: 12px;
+            max-width: 480px;
+            width: 90%;
+            border: 2px solid #3b82f6;
+            text-align: center;
+        }
+
+        .btn-option {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            margin: 8px 0;
+            background: #334155;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .btn-option:hover {
+            background: #2563eb;
+        }
+
+        .btn-choice {
+            width: 48%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            color: white;
+            font-size: 14px;
+        }
+
+        /* POSIÇÃO E TAMANHO DAS ORGANELAS */
+
+        #layer-mitocondria, #layer-reticulo_rugoso, 
+        #layer-reticulo_liso, #layer-golgi, #layer-cilios, 
+        #layer-cloroplasto, #layer-lisossomo, #layer-centriolo {
+            width: 100%;
+            height: auto;
+            left: 0;
+            top: 0;
+            z-index: 2;
+        }
+
+        #layer-nucleo {
+            width: 100%;
+            height: auto;
+            left: 0;
+            top: 0;
+            z-index: 10;
+        }
+
+        /* REGRAS RESPONSIVAS PARA MÓVEIS */
+
+        @media screen and (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+
+            .main-wrapper {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .left-col, .right-col {
+                width: 100%;
+                min-width: 100%;
+            }
+
+            .board-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 6px;
+            }
+
+            .square {
+                min-height: 50px;
+                font-size: 10px;
+                padding: 2px;
+            }
+
+            .player-token {
+                font-size: 16px;
+                top: -6px;
+                right: -2px;
+            }
+
+            .modal-content {
+                padding: 15px;
+                width: 95%;
+            }
+
+            .btn-choice {
+                width: 100%;
+                margin-bottom: 8px;
+            }
+
+            #choice-modal .modal-content > div {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="main-wrapper">
+
+        <!-- COLUNA ESQUERDA: TABULEIRO -->
+
+        <div class="left-col">
+
+            <div class="card-box">
+                <h2 style="margin-top:0;">
+                    🧪 Super Célula: A Trilha da Evolução!
+                </h2>
+
+                <p style="font-size: 12px; color: #94a3b8;">
+                    Acerte as perguntas para ganhar ATP.
+                    Ao errar, você perde ATP.
+                    Use o ATP para adquirir estruturas celulares.
+                </p>
+
+                <button
+                    class="btn-action"
+                    id="btn-roll"
+                    onclick="rollDice()">
+                    🎲 Rolar Dado
+                </button>
+
+                <button
+                    class="btn-reset"
+                    onclick="resetGame()">
+                    🔄 Reiniciar Jogo
+                </button>
+
+                <div
+                    class="board-grid"
+                    id="board">
+                </div>
+            </div>
+
+        </div>
+
+        <!-- COLUNA DIREITA: CÉLULA E LOJA -->
+
+        <div class="right-col">
+
+            <div
+                class="cell-viewer"
+                id="viewer-box">
+
+                <div style="
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    margin-bottom: 8px;
+                ">
+
+                    <span
+                        id="cell-type"
+                        style="
+                            color: #ef4444;
+                            font-weight: bold;
+                            font-size: 13px;
+                        ">
+                        Procarionte Primitiva
+                    </span>
+
+                    <span
+                        class="atp-badge"
+                        id="atp-count">
+                        0 ATP
+                    </span>
+
+                </div>
+
+                <!-- IMAGEM-BASE E CAMADAS DAS ORGANELAS -->
+
+                <div class="realistic-cell-viewer">
+
+                    <img
+                        id="cell-base"
+                        class="cell-layer"
+                        src="imagens/bases/celula-procarionte.png"
+                        alt="Célula em estágio inicial">
+
+                    <!-- Mitocôndrias -->
+                    <img
+                        id="layer-mitocondria"
+                        class="cell-layer organelle-layer"
+                        src="imagens/animal/mitocondria-animal.png"
+                        alt="Mitocôndrias">
+
+                    <!-- Retículo Endoplasmático Rugoso -->
+                    <img
+                        id="layer-reticulo-rugoso"
+                        class="cell-layer organelle-layer"
+                        src="imagens/comuns/reticulo-endoplasmatico-rugoso.png"
+                        alt="Retículo Endoplasmático Rugoso">
+
+                    <!-- Retículo Endoplasmático Liso -->
+                    <img
+                        id="layer-reticulo-liso"
+                        class="cell-layer organelle-layer"
+                        src="imagens/comuns/reticulo-edoplasmatico-liso.png"
+                        alt="Retículo Endoplasmático Liso">
+
+                    <!-- Complexo Golgiense -->
+                    <img
+                        id="layer-golgi"
+                        class="cell-layer organelle-layer"
+                        src="imagens/comuns/complexo-golgiense.png"
+                        alt="Complexo Golgiense">
+
+                    <!-- Cílios e flagelos -->
+                    <img
+                        id="layer-cilios"
+                        class="cell-layer organelle-layer"
+                        src="imagens/animal/cilios.png"
+                        alt="Cílios e flagelos">
+
+                    <!-- Cloroplastos -->
+                    <img
+                        id="layer-cloroplasto"
+                        class="cell-layer organelle-layer"
+                        src="imagens/vegetal/cloroplasto.png"
+                        alt="Cloroplastos">
+
+                    <!-- Lisossomos -->
+                    <img
+                        id="layer-lisossomo"
+                        class="cell-layer organelle-layer"
+                        src="imagens/animal/lisossomos.png"
+                        alt="Lisossomos">
+
+                    <!-- Centríolos -->
+                    <img
+                        id="layer-centriolo"
+                        class="cell-layer organelle-layer"
+                        src="imagens/animal/centriolo.png"
+                        alt="Centríolos">
+
+                    <!-- Núcleo -->
+                    <img
+                        id="layer-nucleo"
+                        class="cell-layer organelle-layer"
+                        src="imagens/comuns/nucleo.png"
+                        alt="Núcleo"> 
+
+                </div>
+            </div>
+
+            <!-- LOJA -->
+
+            <div class="card-box shop-card">
+
+                <h3 style="margin-top:0;">
+                    🛒 Mercado Evolutivo
+                </h3>
+
+                <div id="shop-list"></div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MODAL DE PERGUNTAS -->
+
+    <div
+        class="modal"
+        id="quiz-modal">
+
+        <div class="modal-content">
+
+            <h3 id="modal-station-title">
+                Desafio Celular
+            </h3>
+
+            <p
+                id="quiz-question"
+                style="
+                    font-size: 14px;
+                    color: #cbd5e1;
+                ">
+            </p>
+
+            <div id="quiz-options"></div>
+
+        </div>
+    </div>
+
+    <!-- MODAL DE ESCOLHA DA LINHAGEM -->
+
+    <div
+        class="modal"
+        id="choice-modal">
+
+        <div
+            class="modal-content"
+            style="border-color: #f59e0b;">
+
+            <h2>
+                🌳 MOMENTO DECISIVO! 🦁
+            </h2>
+
+            <p>
+                Sua célula adquiriu a carioteca e se tornou
+                eucarionte. Escolha qual caminho evolutivo
+                pretende seguir:
+            </p>
+
+            <div style="
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+            ">
+
+                <button
+                    class="btn-choice"
+                    style="background: #15803d;"
+                    onclick="chooseLineage('vegetal')">
+
+                    🌱 Célula Vegetal
+                    <br>
+
+                    <small style="font-weight:normal;">
+                        Exige Cloroplasto
+                    </small>
+
+                </button>
+
+                <button
+                    class="btn-choice"
+                    style="background: #ea580c;"
+                    onclick="chooseLineage('animal')">
+
+                    🦁 Célula Animal
+                    <br>
+
+                    <small style="font-weight:normal;">
+                        Exige Lisossomo e Centríolo
+                    </small>
+
+                </button>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE VITÓRIA -->
+
+    <div
+        class="modal"
+        id="win-modal">
+
+        <div
+            class="modal-content"
+            style="border-color: #22c55e;">
+
+            <h1
+                style="
+                    color: #22c55e;
+                    margin-bottom: 5px;
+                ">
+                🏆 EVOLUÇÃO CONCLUÍDA!
+            </h1>
+
+            <h3 id="win-title">
+                Sua célula está completa!
+            </h3>
+
+            <p
+                id="win-desc"
+                style="
+                    font-size: 14px;
+                    color: #cbd5e1;
+                ">
+            </p>
+
+            <button
+                class="btn-action"
+                onclick="resetGame()">
+                🔄 Jogar Novamente
+            </button>
+
+        </div>
+    </div>
+
+    <script>
+        /* =========================
+           VARIÁVEIS DO JOGO
+        ========================= */
+
+        let playerPos = 0;
+        let playerATP = 0;
+        let isEukaryote = false;
+        let lineage = null;
+        let owned = [];
+
+        /* Registro de perguntas já respondidas pelo jogador por estação */
+        let answeredQuestions = {}; 
+
+        /* =========================
+           FUNÇÃO DE REINICIAR O JOGO
+        ========================= */
+        function resetGame() {
+            if (confirm("Tem certeza que deseja reiniciar o jogo? Todo o seu progresso será perdido.")) {
+                location.reload();
+            }
+        }
+
+        /* =========================
+           TABULEIRO
+        ========================= */
+
+        const boardSquares = [
+            { id: 0, name: "Sopa Primordial", type: "start" },
+            { id: 1, name: "Material Genético", type: "quiz" },
+            { id: 2, name: "Membrana Celular", type: "quiz" },
+            { id: 3, name: "Surto de Radiação", type: "evolve" },
+            { id: 4, name: "Fagocitose Primitiva", type: "quiz" },
+            { id: 5, name: "Aparato de Golgi", type: "quiz" },
+            { id: 6, name: "Energia Mitocondrial", type: "quiz" },
+            { id: 7, name: "Dobra de Membrana", type: "evolve" },
+            { id: 8, name: "Síntese Proteica", type: "quiz" },
+            { id: 9, name: "Limpeza Celular", type: "quiz" },
+            { id: 10, name: "Divisão e Centríolos", type: "quiz" },
+            { id: 11, name: "Luz Solar e Plastos", type: "quiz" },
+            { id: 12, name: "Mobilidade Celular", type: "quiz" },
+            { id: 13, name: "Desintoxicação", type: "quiz" },
+            { id: 14, name: "Recarga de ATP", type: "evolve" }
+        ];
+
+        /* =========================
+           PERGUNTAS EQUILIBRADAS (6º ANO)
+        ========================= */
+
+        const stationQuestions = {
+            1: [
+                { q: "Qual é a principal diferença na organização do DNA entre bactérias e células humanas?", opts: ["Nas bactérias o DNA fica disperso no citoplasma, sem núcleo envolvido por membrana", "O DNA das bactérias fica protegido dentro do núcleo", "Bactérias não possuem DNA, usam apenas proteínas"], ans: 0 },
+                { q: "Células procariontes são consideradas mais simples do que as eucariontes porque:", opts: ["Não possuem núcleo delimitado por membrana nem organelas membranosas", "Não realizam nenhum tipo de metabolismo ou divisão", "Não possuem membrana plasmática nem citoplasma"], ans: 0 },
+                { q: "O DNA é fundamental para a vida da célula porque:", opts: ["Contém as informações genéticas que orientam o funcionamento e características da célula", "É a principal fonte de energia imediata consumida durante o movimento", "Atua como uma barreira física impedindo a entrada de água"], ans: 0 },
+                { q: "Analisando um microscópio, você descobre uma célula sem núcleo individualizado. Ela pertence a qual grupo?", opts: ["Bactérias e Arqueas (Procariontes)", "Fungos e Protozoários", "Plantas e Animais"], ans: 0 }
+            ],
+
+            2: [
+                { q: "A membrana plasmática possui 'permeabilidade seletiva'. Isso significa que ela:", opts: ["Controla quais substâncias podem entrar ou sair da célula", "Permite que qualquer substância atravesse livremente sem controle", "É totalmente impermeável e bloqueia a passagem de qualquer molécula"], ans: 0 },
+                { q: "De que é composta a estrutura básica da membrana plasmática?", opts: ["Uma dupla camada de fosfolipídios com proteínas encaixadas", "Apenas por uma camada espessa de carboidratos e açúcares", "Uma parede rígida feita exclusivamente de celulose"], ans: 0 },
+                { q: "Qual destas estruturas é encontrada em TODAS as células sem exceção?", opts: ["Membrana plasmática e citoplasma", "Núcleo individualizado e cloroplastos", "Parede celular de celulose e vacúolos"], ans: 0 },
+                { q: "A entrada de nutrientes essenciais como a glicose e a saída de resíduos da célula dependem de qual estrutura?", opts: ["Membrana plasmática", "Carioteca do núcleo", "Parede celular externa"], ans: 0 }
+            ],
+
+            4: [
+                { q: "O processo de fagocitose ocorre quando a célula:", opts: ["Engloba partículas sólidas do meio externo usando projeções da membrana", "Absorve luz solar para transformar em energia química", "Expulsa água em excesso para equilibrar a pressão interna"], ans: 0 },
+                { q: "No corpo humano, os glóbulos brancos (leucócitos) utilizam a fagocitose para:", opts: ["Engolir e neutralizar microrganismos invasores, como bactérias", "Transportar o oxigênio dos pulmões para os tecidos do corpo", "Produzir anticorpos que circulam livremente no sangue"], ans: 0 },
+                { q: "Como pode ser descrito o citoplasma de uma célula eucarionte?", opts: ["Um fluido gelatinoso (citosol) onde ficam imersas as organelas celulares", "Uma estrutura rígida feita de minerais que dá formato fixo à célula", "Um espaço totalmente vazio preenchido por gases respiratórios"], ans: 0 },
+                { q: "A fagocitose é considerada uma forma de captura de alimento para alguns seres unicelulares, como:", opts: ["Amebas", "Bactérias autótrofas", "Vírus"], ans: 0 }
+            ],
+
+            5: [
+                { q: "Qual é a função central do Complexo Golgiense no funcionamento celular?", opts: ["Modificar, empacotar e secretar substâncias produzidas pela célula", "Sintetizar glicose a partir da luz solar", "Realizar a respiração celular para gerar energia"], ans: 0 },
+                { q: "O Complexo Golgiense trabalha em parceria direta com qual organela, recebendo as proteínas por ela fabricadas?", opts: ["Retículo Endoplasmático Rugoso", "Mitocôndria", "Cloroplasto"], ans: 0 },
+                { q: "As substâncias processadas pelo Complexo Golgiense são transportadas em seu interior por meio de:", opts: ["Vesículas membranosas que se desprendem de suas dobras", "Canais abertos que conectam diretamente ao meio externo", "Microtúbulos rígidos de queratina"], ans: 0 },
+                { q: "Em células de glândulas que produzem saliva e sucos digestivos, o Complexo Golgiense é bem desenvolvido porque essas células:", opts: ["Secretam grandes quantidades de proteínas e enzimas para fora", "Precisam de muita luz para realizar fotossíntese rápida", "Não possuem mitocôndrias para gerar energia própria"], ans: 0 }
+            ],
+
+            6: [
+                { q: "A mitocôndria é a organela responsável pela respiração celular. Esse processo consiste em:", opts: ["Consumir oxigênio e glicose para liberar energia (ATP) para a célula", "Usar gás carbônico e luz solar para produzir açúcares", "Quebrar proteínas velhas para reaproveitar os aminoácidos"], ans: 0 },
+                { q: "Qual das opções abaixo explica a presença de muitas mitocôndrias nas células musculares?", opts: ["A atividade muscular exige um alto consumo constante de energia (ATP)", "As células musculares realizam fotossíntese durante o exercício", "A mitocôndria é a responsável direta pela contração do tecido sem gastar energia"], ans: 0 },
+                { q: "O gás oxigênio captado pelos nossos pulmões é levado pelo sangue até as células para ser utilizado em qual organela?", opts: ["Mitocôndria", "Complexo Golgiense", "Lisossomo"], ans: 0 },
+                { q: "Além de produzir ATP, a mitocôndria se destaca por ser uma organela que possui:", opts: ["Seu próprio DNA e capacidade de se duplicar", "Uma parede de celulose externa resistente", "A capacidade de absorver luz solar verde"], ans: 0 }
+            ],
+
+            8: [
+                { q: "A função primária dos ribossomos espalhados no citoplasma ou grudados no retículo é:", opts: ["Sintetizar proteínas a partir das instruções do código genético", "Armazenar gorduras e óleos para momentos de escassez", "Destruir estruturas celulares velhas e desgastadas"], ans: 0 },
+                { q: "O Retículo Endoplasmático Rugoso recebe essa denominação devido à presença de:", opts: ["Ribossomos aderidos à sua membrana externa", "Lisossomos em seu espaço interno", "Grãos de amido armazenados"], ans: 0 },
+                { q: "Qual é o papel do Retículo Endoplasmático na dinâmica da célula?", opts: ["Funciona como uma rede de canais que transporta e distribui substâncias", "Atua como usina geradora de luz e calor para as reações químicas", "Armazena o material genético isolado do restante do citoplasma"], ans: 0 },
+                { q: "As proteínas produzidas pelos ribossomos do Retículo Rugoso geralmente são enviadas para:", opts: ["O Complexo Golgiense, para serem secretadas ou enviadas à membrana", "O interior da mitocôndria para serem queimadas como combustível", "O núcleo, para substituir o DNA desgastado"], ans: 0 }
+            ],
+
+            9: [
+                { q: "Os lisossomos são organelas especializadas na digestão intracelular porque contêm:", opts: ["Enzimas digestivas capazes de quebrar grandes moléculas", "Pigmentos verdes que absorvem a radiação solar", "Hormônios que aceleram o crescimento do núcleo"], ans: 0 },
+                { q: "Quando uma organela da célula envelhece e para de funcionar, o lisossomo a engloba e destrói. Esse processo chama-se:", opts: ["Autofagia", "Fotossíntese", "Osmose"], ans: 0 },
+                { q: "Se a célula absorve uma partícula estranha ou alimento por fagocitose, o que acontece a seguir?", opts: ["O lisossomo se funde à vesícula contendo a partícula para realizar a digestão", "A mitocôndria queima a partícula diretamente com oxigênio", "O retículo liso transforma a partícula em DNA suplementar"], ans: 0 },
+                { q: "Por que as enzimas do lisossomo precisam ficar isoladas dentro de uma bolsa membranosa?", opts: ["Para não digerirem o citoplasma e as outras organelas saudáveis da célula", "Porque elas precisam de luz solar direta para funcionarem", "Para evitar que saiam pela membrana plasmática espontaneamente"], ans: 0 }
+            ],
+
+            10: [
+                { q: "Qual é o papel principal dos centríolos nas células animais?", opts: ["Organizar as fibras que orientam a divisão do material genético na divisão celular", "Sintetizar ácidos graxos e lipídios para a membrana", "Absorver a água do meio externo para manter o formato da célula"], ans: 0 },
+                { q: "A divisão celular é um processo essencial para os organismos multicelulares porque permite:", opts: ["O crescimento do corpo e a regeneração de tecidos lesionados", "A conversão de matéria inorgânica em energia solar luminosa", "A eliminação de todas as organelas acumuladas no citoplasma"], ans: 0 },
+                { q: "Além da divisão celular, os centríolos são responsáveis pela formação de quais estruturas?", opts: ["Cílios e flagelos", "Parede celular de celulose", "Carioteca do núcleo"], ans: 0 },
+                { q: "Células vegetais de plantas superiores diferem das células animais por NÃO possuírem tipicamente:", opts: ["Centríolos bem definidos", "Mitocôndrias ativas", "Membrana plasmática"], ans: 0 }
+            ],
+
+            11: [
+                { q: "Os cloroplastos são organelas exclusivas de células vegetais e algas. Sua função é:", opts: ["Realizar a fotossíntese para produzir matéria orgânica (glicose)", "Digerir substâncias orgânicas absorvidas do solo", "Armazenar proteína para o crescimento de frutos"], ans: 0 },
+                { q: "A clorofila é o pigmento verde presente nos cloroplastos que tem como papel:", opts: ["Capturar a energia da luz solar necessária para a fotossíntese", "Digerir vírus e bactérias que invadem as folhas", "Proteger a planta contra a perda excessiva de água"], ans: 0 },
+                { q: "Quais são os reagentes químicos consumidos pelo cloroplasto durante a fotossíntese?", opts: ["Gás carbônico (CO₂) e água (H₂O), utilizando luz solar", "Gás oxigênio (O₂) e glicose, liberando luz", "Nitrogênio atmosférico e proteínas do solo"], ans: 0 },
+                { q: "Diferente dos animais, as plantas são classificadas como organismos autótrofos porque:", opts: ["Conseguem produzir seu próprio alimento orgânico através da fotossíntese", "Não precisam de energia nem de água para sobreviver", "Conseguem se mover em direção às fontes de nutrientes sólidos"], ans: 0 }
+            ],
+
+            12: [
+                { q: "Cílios e flagelos são extensões da membrana plasmática usadas principalmente para:", opts: ["Locomoção celular ou movimentação de fluidos ao redor da célula", "Ancorar a célula rigidamente em superfícies minerais", "Absorver oxigênio e gás carbônico diretamente do ar"], ans: 0 },
+                { q: "Qual é a principal diferença morfológica entre cílios e flagelos?", opts: ["Cílios são curtos e numerosos; flagelos são longos e geralmente únicos ou poucos", "Cílios são feitos de lipídios; flagelos são feitos de celulose rígida", "Cílios ficam dentro do núcleo; flagelos ficam no citoplasma"], ans: 0 },
+                { q: "No sistema respiratório humano, as células ciliadas da traqueia têm a função de:", opts: ["Mover o muco retendo poeira e microrganismos para fora dos pulmões", "Absorver o gás oxigênio diretamente para as artérias", "Secretar o suco gástrico necessário para eliminar vírus"], ans: 0 },
+                { q: "O espermatozoide é um exemplo clássico de célula humana que utiliza qual estrutura para nadar até o óvulo?", opts: ["Flagelo", "Cílios", "Pseudópodes"], ans: 0 }
+            ],
+
+            13: [
+                { q: "Ao contrário do Retículo Rugoso, o Retículo Endoplasmático Liso é especializado em:", opts: ["Síntese de lipídios (gorduras) e desintoxicação de substâncias nocivas", "Produção de proteínas e transporte de DNA", "Captação de fótons de luz para produção de glicose"], ans: 0 },
+                { q: "O Retículo Liso atua na desintoxicação neutralizando substâncias como álcool e medicamentos. Qual órgão possui células ricas nessa organela?", opts: ["Fígado", "Coração", "Pulmão"], ans: 0 },
+                { q: "A ausência de ribossomos na superfície do Retículo Liso faz com que ele tenha uma aparência:", opts: ["Lisa e tubular sob o microscópio eletrônico", "Granulada e áspera", "Rígida e cristalina"], ans: 0 },
+                { q: "Além da síntese de lipídios, o Retículo Liso em células musculares tem o papel especial de armazenar:", opts: ["Íons de cálcio essenciais para a contração muscular", "Glicose pura em forma de cristais", "Enzimas digestivas para a autofagia"], ans: 0 }
+            ]
+        };
+
+        /* =========================
+           ITENS DA LOJA
+        ========================= */
+
+        const shopItems = [
+            { id: "nucleo", name: "Núcleo / Carioteca", cost: 20, req: "base", desc: "Isola o DNA e transforma a célula em eucarionte." },
+            { id: "mitocondria", name: "Mitocôndria", cost: 15, req: "base", desc: "Responsável pela produção de ATP." },
+            { id: "reticulo_rugoso", name: "Retículo Rugoso", cost: 10, req: "base", desc: "Participa da produção de proteínas." },
+            { id: "reticulo_liso", name: "Retículo Liso", cost: 10, req: "base", desc: "Produz lipídios e participa da desintoxicação." },
+            { id: "golgi", name: "Complexo Golgiense", cost: 12, req: "base", desc: "Modifica, empacota e envia substâncias." },
+            { id: "cilios", name: "Cílios e Flagelos", cost: 8, req: "base", desc: "Relacionados à movimentação celular." },
+            { id: "cloroplasto", name: "Cloroplasto", cost: 15, req: "vegetal", desc: "Realiza fotossíntese." },
+            { id: "vacuolo", name: "Vacúolo", cost: 10, req: "vegetal", desc: "Armazena substâncias e ajuda no equilíbrio de água." },
+            { id: "lisossomo", name: "Lisossomos", cost: 10, req: "animal", desc: "Realizam digestão intracelular." },
+            { id: "centriolo", name: "Centríolos", cost: 8, req: "animal", desc: "Participam da divisão celular." }
+        ];
+
+        /* =========================
+           ATUALIZAÇÃO DO TABULEIRO
+        ========================= */
+
+        function renderBoard() {
+            const boardEl = document.getElementById("board");
+            boardEl.innerHTML = "";
+
+            boardSquares.forEach((sq, idx) => {
+                const el = document.createElement("div");
+
+                el.className = `square ${sq.type} ${idx === playerPos ? "active" : ""}`;
+
+                el.innerHTML = `<span>${idx + 1}. ${sq.name}</span>`;
+
+                if (idx === playerPos) {
+                    el.innerHTML += `<div class="player-token">${isEukaryote ? "🔬" : "🦠"}</div>`;
+                }
+
+                boardEl.appendChild(el);
+            });
+        }
+
+        /* =========================
+           ATUALIZAÇÃO DA LOJA
+        ========================= */
+
+        function renderShop() {
+            const shopEl = document.getElementById("shop-list");
+            shopEl.innerHTML = "";
+
+            shopItems.forEach(item => {
+                if (lineage === "vegetal" && (item.id === "cilios" || item.id === "flagelos")) return;
+                if (item.req === "vegetal" && lineage !== "vegetal") return;
+                if (item.req === "animal" && lineage !== "animal") return;
+
+                const hasIt = owned.includes(item.id);
+
+                shopEl.innerHTML += `
+                    <div class="shop-item ${hasIt ? "owned" : ""}">
+                        <div>
+                            <strong>${item.name}</strong><br>
+                            <small style="color:#94a3b8">${item.desc}</small><br>
+                            <strong style="color:#f59e0b">${item.cost} ATP</strong>
+                        </div>
+                        <button
+                            class="btn-action"
+                            style="width: auto; padding: 4px 8px; font-size: 11px;"
+                            onclick="buyOrganelle('${item.id}')"
+                            ${hasIt ? "disabled" : ""}>
+                            ${hasIt ? "Adquirido" : "Comprar"}
+                        </button>
+                    </div>
+                `;
+            });
+        }
+
+        /* =========================
+           ATUALIZAÇÃO DAS IMAGENS
+        ========================= */
+        function updateCellBase() {
+            const cellBase = document.getElementById("cell-base");
+
+            if (lineage === "animal") {
+                cellBase.src = "imagens/bases/celula-animal.png";
+            } else if (lineage === "vegetal") {
+                cellBase.src = "imagens/bases/celula-vegetal.png";
+            } else {
+                cellBase.src = "imagens/bases/celula-procarionte.png";
+            }
+        }
+
+        function updateCellVisual() {
+            document.querySelectorAll(".organelle-layer").forEach(layer => {
+                layer.classList.remove("visible");
+                layer.style.display = "none";
+                layer.style.opacity = "0";
+            });
+
+            function showLayer(id) {
+                const layer = document.getElementById(id);
+                if (layer) {
+                    layer.style.display = "block";
+                    layer.style.opacity = "1";
+                    layer.classList.add("visible");
+                }
+            }
+
+            if (owned.includes("nucleo")) showLayer("layer-nucleo");
+            if (owned.includes("mitocondria")) showLayer("layer-mitocondria");
+            if (owned.includes("reticulo_rugoso")) showLayer("layer-reticulo-rugoso");
+            if (owned.includes("reticulo_liso")) showLayer("layer-reticulo-liso");
+            if (owned.includes("golgi")) showLayer("layer-golgi");
+
+            if (lineage === "animal") {
+                if (owned.includes("cilios")) showLayer("layer-cilios");
+                if (owned.includes("lisossomo")) showLayer("layer-lisossomo");
+                if (owned.includes("centriolo")) showLayer("layer-centriolo");
+            }
+
+            if (lineage === "vegetal") {
+                if (owned.includes("cloroplasto")) showLayer("layer-cloroplasto");
+                if (owned.includes("vacuolo")) showLayer("layer-vacuolo");
+            }
+
+            const cellType = document.getElementById("cell-type");
+
+            if (!isEukaryote) {
+                cellType.innerText = "Procarionte Primitiva";
+                cellType.style.color = "#ef4444";
+            } else if (lineage === "vegetal") {
+                cellType.innerText = "Célula Eucarionte Vegetal";
+                cellType.style.color = "#22c55e";
+            } else if (lineage === "animal") {
+                cellType.innerText = "Célula Eucarionte Animal";
+                cellType.style.color = "#f97316";
+            } else {
+                cellType.innerText = "Célula Eucarionte";
+                cellType.style.color = "#a855f7";
+            }
+        }
+
+        /* =========================
+           ROLAR O DADO
+        ========================= */
+
+        function rollDice() {
+            const rollButton = document.getElementById("btn-roll");
+            rollButton.disabled = true;
+
+            const roll = Math.floor(Math.random() * 3) + 1;
+            playerPos = (playerPos + roll) % boardSquares.length;
+
+            renderBoard();
+
+            setTimeout(() => {
+                triggerSquareEvent(boardSquares[playerPos]);
+            }, 300);
+        }
+
+        /* =========================
+           EVENTO DA CASA
+        ========================= */
+
+        function triggerSquareEvent(square) {
+            const rollButton = document.getElementById("btn-roll");
+
+            if (square.type === "start") {
+                rollButton.disabled = false;
+                return;
+            }
+
+            if (square.type === "evolve") {
+                alert(`⚡ CASA BÔNUS: ${square.name}! Você ganhou +15 ATP!`);
+                playerATP += 15;
+                updateStats();
+                rollButton.disabled = false;
+                return;
+            }
+
+            const questionsList = stationQuestions[square.id];
+
+            if (questionsList && questionsList.length > 0) {
+                showQuiz(square.id, square.name);
+            } else {
+                rollButton.disabled = false;
+            }
+        }
+
+        /* =========================
+           MOSTRAR PERGUNTA
+        ========================= */
+
+        function showQuiz(stationId, stationName) {
+            const modal = document.getElementById("quiz-modal");
+            const questionsList = stationQuestions[stationId];
+
+            if (!answeredQuestions[stationId]) {
+                answeredQuestions[stationId] = [];
+            }
+
+            const availableIndexes = [];
+            questionsList.forEach((q, idx) => {
+                if (!answeredQuestions[stationId].includes(idx)) {
+                    availableIndexes.push(idx);
+                }
+            });
+
+            if (availableIndexes.length === 0) {
+                alert(`✨ Você já respondeu a todas as perguntas da estação "${stationName}"! Siga em frente.`);
+                document.getElementById("btn-roll").disabled = false;
+                return;
+            }
+
+            const randomChosenIndex = availableIndexes[Math.floor(Math.random() * availableIndexes.length)];
+            const qObj = questionsList[randomChosenIndex];
+
+            document.getElementById("modal-station-title").innerText = `Estação: ${stationName}`;
+            document.getElementById("quiz-question").innerText = qObj.q;
+
+            const optsDiv = document.getElementById("quiz-options");
+            optsDiv.innerHTML = "";
+
+            let optionsWithIndex = qObj.opts.map((opt, i) => ({ text: opt, originalIndex: i }));
+            optionsWithIndex.sort(() => Math.random() - 0.5);
+
+            optionsWithIndex.forEach(optObj => {
+                const btn = document.createElement("button");
+                btn.className = "btn-option";
+                btn.innerText = optObj.text;
+
+                btn.onclick = () => {
+                    answeredQuestions[stationId].push(randomChosenIndex);
+
+                    if (optObj.originalIndex === qObj.ans) {
+                        alert("✅ Resposta correta! Você ganhou +10 ATP!");
+                        playerATP += 10;
+                    } else {
+                        playerATP = Math.max(0, playerATP - 10);
+                        alert("❌ Resposta incorreta! Você perdeu -10 ATP.");
+                    }
+
+                    modal.style.display = "none";
+                    updateStats();
+                    document.getElementById("btn-roll").disabled = false;
+                };
+
+                optsDiv.appendChild(btn);
+            });
+
+            modal.style.display = "flex";
+        }
+
+        /* =========================
+           COMPRAR ORGANELA
+        ========================= */
+
+        function buyOrganelle(id) {
+            const item = shopItems.find(i => i.id === id);
+
+            if (!item) return;
+            if (owned.includes(id)) {
+                alert("Essa estrutura já foi adquirida.");
+                return;
+            }
+            if (playerATP < item.cost) {
+                alert("ATP insuficiente! Continue avançando no tabuleiro.");
+                return;
+            }
+            if (item.id !== "nucleo" && !isEukaryote) {
+                alert("⚠️ Compre primeiro o núcleo para transformar a célula em eucarionte.");
+                return;
+            }
+            if (item.req === "vegetal" && lineage !== "vegetal") {
+                alert("Essa estrutura pertence à linhagem vegetal.");
+                return;
+            }
+            if (item.req === "animal" && lineage !== "animal") {
+                alert("Essa estrutura pertence à linhagem animal.");
+                return;
+            }
+
+            playerATP -= item.cost;
+            owned.push(id);
+
+            updateCellVisual();
+
+            if (id === "nucleo") {
+                isEukaryote = true;
+                updateCellVisual();
+                document.getElementById("choice-modal").style.display = "flex";
+            } else { 
+                updateCellVisual();
+            }
+
+            updateStats();
+            renderShop();
+            updateCellVisual();
+            checkWinCondition();
+        }
+
+        /* =========================
+           ESCOLHER LINHAGEM
+        ========================= */
+
+        function chooseLineage(type) {
+            lineage = type;
+            updateCellBase();
+
+            document.getElementById("choice-modal").style.display = "none";
+
+            updateCellVisual();
+            renderBoard();
+            renderShop();
+            checkWinCondition();
+        }
+
+        /* =========================
+           EFETUAR DISPARO DE CONFETES
+        ========================= */
+        function triggerConfetti() {
+            if (typeof confetti === 'function') {
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
+        /* =========================
+           VERIFICAR VITÓRIA
+        ========================= */
+
+        function checkWinCondition() {
+            const baseOrganelles = ["nucleo", "mitocondria", "reticulo_rugoso", "reticulo_liso", "golgi", "cilios"];
+            const hasBase = baseOrganelles.every(org => owned.includes(org));
+
+            if (!hasBase || !lineage) return;
+
+            let won = false;
+
+            if (lineage === "vegetal" && owned.includes("cloroplasto")) {
+                won = true;
+            } else if (lineage === "animal" && owned.includes("lisossomo") && owned.includes("centriolo")) {
+                won = true;
+            }
+
+            if (won) {
+                const winModal = document.getElementById("win-modal");
+                const winTitle = document.getElementById("win-title");
+                const winDesc = document.getElementById("win-desc");
+
+                if (lineage === "vegetal") {
+                    winTitle.innerText = "🎉 CÉLULA VEGETAL EVOLUÍDA!";
+                    winDesc.innerText = "Parabéns, Biólogo! Sua célula vegetal adquiriu todas as organelas e está pronta para realizar fotossíntese e crescer!";
+                } else {
+                    winTitle.innerText = "🎉 CÉLULA ANIMAL EVOLUÍDA!";
+                    winDesc.innerText = "Parabéns, Biólogo! Sua célula animal adquiriu todas as organelas necessárias e completou sua evolução com sucesso!";
+                }
+
+                document.getElementById("viewer-box").style.borderColor = "#22c55e";
+                winModal.style.display = "flex";
+
+                triggerConfetti();
+            }
+        }
+
+        /* =========================
+           ATUALIZAR ATP E TABULEIRO
+        ========================= */
+
+        function updateStats() {
+            document.getElementById("atp-count").innerText = `${playerATP} ATP`;
+            renderBoard();
+            updateCellVisual();
+        }
+
+        /* =========================
+           INICIALIZAÇÃO
+        ========================= */
+
+        renderBoard();
+        renderShop();
+        updateStats();
+        updateCellVisual();
+
+    </script>
+
+</body>
+</html>
